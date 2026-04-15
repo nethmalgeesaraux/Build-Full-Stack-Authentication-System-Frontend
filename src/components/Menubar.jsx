@@ -8,6 +8,10 @@ const Menubar = () => {
                 <img src={logoHome} alt="logo" width={32} height={32} />
                 <span className="fw-bold fs-4 text-dark">Authify</span>
             </div>
+
+            <div className="btn btn-outline-dark rounded-pill px-3">
+                Login <i className="bi bi-arrow-right ms-2"></i>
+            </div>
         </nav>
 
     )
