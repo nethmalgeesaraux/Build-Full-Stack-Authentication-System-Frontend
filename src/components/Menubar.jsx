@@ -13,7 +13,7 @@ const Menubar = () => {
                 <span className="fw-bold fs-4 text-dark">Authify</span>
             </div>
 
-            <div className="btn btn-outline-dark rounded-pill px-3" onClick={()=> navigate("/Login")}>
+            <div className="btn btn-outline-dark rounded-pill px-3" onClick={()=> navigate("/login")}>
                 Login <i className="bi bi-arrow-right ms-2"></i>
             </div>
         </nav>
