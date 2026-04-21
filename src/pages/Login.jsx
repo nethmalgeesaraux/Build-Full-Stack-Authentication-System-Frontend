@@ -1,13 +1,52 @@
 import React, { useState } from 'react'
 import Logo_home from '../assets/Logo_home.png'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAppContext } from '../Context/useAppContext'
 import './Login.css'
 
 const Login = () => {
   const [isCreateAccount, setIsCreateAccount] = useState(false)
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+  })
+  const { registerUser, loginUser, loading } = useAppContext()
+  const navigate = useNavigate()
 
-  const handleSubmit = (event) => {
+  const handleInputChange = (event) => {
+    const { id, value } = event.target
+    setFormData((prev) => ({
+      ...prev,
+      [id]: value,
+    }))
+  }
+
+  const handleSubmit = async (event) => {
     event.preventDefault()
+
+    const payload = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+    }
+
+    const result = isCreateAccount
+      ? await registerUser(payload)
+      : await loginUser(payload)
+
+    if (result.success) {
+      navigate('/')
+    }
+  }
+
+  const toggleMode = () => {
+    setIsCreateAccount((prev) => !prev)
+    setFormData({
+      fullName: '',
+      email: '',
+      password: '',
+    })
   }
 
   return (
@@ -46,6 +85,8 @@ const Login = () => {
                   id="fullName"
                   className="form-control"
                   placeholder="Enter fullname"
+                  value={formData.fullName}
+                  onChange={handleInputChange}
                   required
                 />
               </>
@@ -57,6 +98,8 @@ const Login = () => {
               id="email"
               className="form-control"
               placeholder="Enter email"
+              value={formData.email}
+              onChange={handleInputChange}
               required
             />
 
@@ -66,6 +109,8 @@ const Login = () => {
               id="password"
               className="form-control"
               placeholder="************"
+              value={formData.password}
+              onChange={handleInputChange}
               required
             />
 
@@ -79,8 +124,9 @@ const Login = () => {
               <Link to="/reset-password" className="forgot-link">Forgot password?</Link>
             </div>
 
-            <button type="submit" className="login-btn">
-              {isCreateAccount ? 'Sign Up' : 'Sign In'} <i className="bi bi-arrow-right ms-2"></i>
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? 'Please wait...' : isCreateAccount ? 'Sign Up' : 'Sign In'}
+              {!loading && <i className="bi bi-arrow-right ms-2"></i>}
             </button>
 
             <p className="mode-switch">
@@ -88,7 +134,7 @@ const Login = () => {
               <button
                 type="button"
                 className="mode-switch-btn"
-                onClick={() => setIsCreateAccount((prev) => !prev)}
+                onClick={toggleMode}
               >
                 {isCreateAccount ? 'Login' : 'Create Account'}
               </button>

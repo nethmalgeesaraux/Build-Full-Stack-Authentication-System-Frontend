@@ -183,6 +183,13 @@
   box-shadow: 0 10px 24px rgba(71, 54, 205, 0.32);
 }
 
+.login-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .mode-switch {
   margin: 6px 0 0;
   text-align: center;
