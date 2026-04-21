@@ -16,7 +16,7 @@ const defaultContextValue = {
   verifyOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   sendResetOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   resetPassword: async () => ({ success: false, message: 'AppContextProvider is missing' }),
-  logoutUser: () => {},
+  logoutUser: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   setUser: () => {},
 }
 
@@ -323,13 +323,45 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [])
 
-  const logoutUser = useCallback(() => {
+  const clearLocalAuthState = useCallback(() => {
     localStorage.removeItem('token')
     localStorage.removeItem('userEmail')
     setToken('')
     setUser(null)
     setUserEmail('')
   }, [])
+
+  const logoutUser = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      const endpoint = `${getApiBaseUrl()}/api/logout`
+      let data
+
+      try {
+        const response = await axios.post(endpoint, null, getAuthConfig(token))
+        data = response.data
+      } catch (primaryError) {
+        if (primaryError?.response?.status === 404 || primaryError?.response?.status === 405) {
+          const response = await axios.get(endpoint, getAuthConfig(token))
+          data = response.data
+        } else {
+          throw primaryError
+        }
+      }
+
+      toast.success(data?.message || 'Logout successful')
+      return { success: true, data }
+    } catch (error) {
+      if (error?.response?.status !== 401) {
+        toast.info('Logged out locally')
+      }
+      return { success: error?.response?.status === 401, message: getErrorMessage(error, 'Logged out locally') }
+    } finally {
+      clearLocalAuthState()
+      setLoading(false)
+    }
+  }, [token, clearLocalAuthState])
 
   const contextValue = useMemo(
     () => ({
