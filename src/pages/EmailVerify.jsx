@@ -142,7 +142,7 @@ const EmailVerify = () => {
     }
 
     if (result?.success) {
-      navigate('/login')
+      navigate('/')
     }
   }
 

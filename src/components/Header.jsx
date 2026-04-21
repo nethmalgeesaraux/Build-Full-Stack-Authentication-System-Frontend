@@ -88,10 +88,10 @@ const Header = () => {
         Let's start with a quick product tour and you can setup
         the authentication in no time!
       </p>
-      {isAuthenticated && (
+      {!isAuthenticated && (
         <button
           type="button"
-          onClick={() => navigate('/email-verify')}
+          onClick={() => navigate('/login')}
           style={{ padding: '0.9rem 2rem', border: '1px solid #333', borderRadius: '999px', background: '#fff', cursor: 'pointer', marginTop: '1rem' }}
         >
           Get Started
