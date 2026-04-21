@@ -11,6 +11,8 @@ const defaultContextValue = {
   isAuthenticated: false,
   registerUser: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   loginUser: async () => ({ success: false, message: 'AppContextProvider is missing' }),
+  sendResetOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
+  resetPassword: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   logoutUser: () => {},
   setUser: () => {},
 }
@@ -105,6 +107,64 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [persistAuthState])
 
+  const sendResetOtp = useCallback(async (email) => {
+    setLoading(true)
+    const trimmedEmail = email?.trim()
+
+    try {
+      if (!trimmedEmail) {
+        toast.error('Email is required')
+        return { success: false, message: 'Email is required' }
+      }
+
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/api/send-reset-otp`,
+        null,
+        {
+          params: { email: trimmedEmail },
+        }
+      )
+
+      toast.success(data?.message || 'Reset OTP sent to your email')
+      return { success: true, data }
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to send reset OTP')
+      toast.error(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const resetPassword = useCallback(async ({ email, otp, password, confirmPassword }) => {
+    setLoading(true)
+
+    const payload = {
+      email: email?.trim(),
+      otp: otp?.trim(),
+      newPassword: password,
+      confirmPassword,
+    }
+
+    Object.keys(payload).forEach((key) => {
+      if (!payload[key]) {
+        delete payload[key]
+      }
+    })
+
+    try {
+      const { data } = await axios.post(`${getApiBaseUrl()}/api/reset-password`, payload)
+      toast.success(data?.message || 'Password reset successful')
+      return { success: true, data }
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to reset password')
+      toast.error(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   const logoutUser = useCallback(() => {
     localStorage.removeItem('token')
     setToken('')
@@ -120,10 +180,12 @@ export const AppContextProvider = ({ children }) => {
       isAuthenticated: Boolean(token),
       registerUser,
       loginUser,
+      sendResetOtp,
+      resetPassword,
       logoutUser,
       setUser,
     }),
-    [token, user, loading, registerUser, loginUser, logoutUser]
+    [token, user, loading, registerUser, loginUser, sendResetOtp, resetPassword, logoutUser]
   )
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
