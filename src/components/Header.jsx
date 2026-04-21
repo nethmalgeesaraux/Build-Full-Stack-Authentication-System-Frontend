@@ -1,8 +1,12 @@
 import React, { useEffect, useId, useRef } from 'react'
 import { animate } from 'animejs'
+import { useNavigate } from 'react-router-dom'
 import header from '../assets/header.png'
+import { useAppContext } from '../Context/useAppContext'
 
 const Header = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAppContext()
   const turbulenceRef = useRef(null)
   const displacementMapRef = useRef(null)
   const polygonRef = useRef(null)
@@ -84,9 +88,15 @@ const Header = () => {
         Let's start with a quick product tour and you can setup
         the authentication in no time!
       </p>
-      <button style={{ padding: '0.9rem 2rem', border: '1px solid #333', borderRadius: '999px', background: '#fff', cursor: 'pointer', marginTop: '1rem' }}>
-        Get Started
-      </button>
+      {isAuthenticated && (
+        <button
+          type="button"
+          onClick={() => navigate('/email-verify')}
+          style={{ padding: '0.9rem 2rem', border: '1px solid #333', borderRadius: '999px', background: '#fff', cursor: 'pointer', marginTop: '1rem' }}
+        >
+          Get Started
+        </button>
+      )}
     </div>
   )
 }

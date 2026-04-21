@@ -7,10 +7,13 @@ const defaultContextValue = {
   apiBaseUrl: '',
   token: '',
   user: null,
+  userEmail: '',
   loading: false,
   isAuthenticated: false,
   registerUser: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   loginUser: async () => ({ success: false, message: 'AppContextProvider is missing' }),
+  sendOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
+  verifyOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   sendResetOtp: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   resetPassword: async () => ({ success: false, message: 'AppContextProvider is missing' }),
   logoutUser: () => {},
@@ -35,6 +38,12 @@ const getTokenFromResponse = (data) =>
   ''
 
 const getUserFromResponse = (data) => data?.user || data?.data?.user || null
+const getEmailFromResponse = (data) =>
+  data?.user?.email ||
+  data?.data?.user?.email ||
+  data?.email ||
+  data?.data?.email ||
+  ''
 
 const getStoredToken = () => {
   if (typeof window === 'undefined') {
@@ -44,14 +53,41 @@ const getStoredToken = () => {
   return localStorage.getItem('token') || ''
 }
 
+const getStoredUserEmail = () => {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return localStorage.getItem('userEmail') || ''
+}
+
+const getAuthConfig = (rawToken) => {
+  const authToken = rawToken || getStoredToken()
+  const baseConfig = { withCredentials: true }
+
+  if (!authToken) {
+    return baseConfig
+  }
+
+  return {
+    ...baseConfig,
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      token: authToken,
+    },
+  }
+}
+
 export const AppContextProvider = ({ children }) => {
   const [loading, setLoading] = useState(false)
   const [token, setToken] = useState(getStoredToken)
   const [user, setUser] = useState(null)
+  const [userEmail, setUserEmail] = useState(getStoredUserEmail)
 
   const persistAuthState = useCallback((data) => {
     const nextToken = getTokenFromResponse(data)
     const nextUser = getUserFromResponse(data)
+    const nextEmail = getEmailFromResponse(data)
 
     if (nextToken) {
       localStorage.setItem('token', nextToken)
@@ -61,20 +97,34 @@ export const AppContextProvider = ({ children }) => {
     if (nextUser) {
       setUser(nextUser)
     }
+
+    if (nextEmail) {
+      localStorage.setItem('userEmail', nextEmail)
+      setUserEmail(nextEmail)
+    }
   }, [])
 
   const registerUser = useCallback(async ({ fullName, email, password }) => {
     setLoading(true)
 
     try {
-      const { data } = await axios.post(`${getApiBaseUrl()}/api/profile/register`, {
-        fullName,
-        name: fullName,
-        email,
-        password,
-      })
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/api/profile/register`,
+        {
+          fullName,
+          name: fullName,
+          email,
+          password,
+        },
+        { withCredentials: true }
+      )
 
       persistAuthState(data)
+      const resolvedEmail = getEmailFromResponse(data) || email?.trim()
+      if (resolvedEmail) {
+        localStorage.setItem('userEmail', resolvedEmail)
+        setUserEmail(resolvedEmail)
+      }
       toast.success(data?.message || 'Account created successfully')
       return { success: true, data }
     } catch (error) {
@@ -90,12 +140,21 @@ export const AppContextProvider = ({ children }) => {
     setLoading(true)
 
     try {
-      const { data } = await axios.post(`${getApiBaseUrl()}/api/login`, {
-        email,
-        password,
-      })
+      const { data } = await axios.post(
+        `${getApiBaseUrl()}/api/login`,
+        {
+          email,
+          password,
+        },
+        { withCredentials: true }
+      )
 
       persistAuthState(data)
+      const resolvedEmail = getEmailFromResponse(data) || email?.trim()
+      if (resolvedEmail) {
+        localStorage.setItem('userEmail', resolvedEmail)
+        setUserEmail(resolvedEmail)
+      }
       toast.success(data?.message || 'Login successful')
       return { success: true, data }
     } catch (error) {
@@ -136,6 +195,105 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [])
 
+  const sendOtp = useCallback(async (email) => {
+    setLoading(true)
+    const trimmedEmail = email?.trim()
+
+    try {
+      if (!trimmedEmail) {
+        toast.error('Email is required')
+        return { success: false, message: 'Email is required' }
+      }
+
+      const endpoint = `${getApiBaseUrl()}/api/sendOtp`
+      const authConfig = getAuthConfig(token)
+      const requests = [
+        () => axios.post(endpoint, { email: trimmedEmail }, authConfig),
+        () => axios.post(endpoint, null, { ...authConfig, params: { email: trimmedEmail } }),
+        () => axios.post(endpoint, { email: trimmedEmail }, { withCredentials: true }),
+        () => axios.post(endpoint, null, { withCredentials: true, params: { email: trimmedEmail } }),
+      ]
+
+      let data
+      let lastError
+
+      for (const request of requests) {
+        try {
+          const response = await request()
+          data = response.data
+          break
+        } catch (requestError) {
+          lastError = requestError
+        }
+      }
+
+      if (!data && lastError) {
+        throw lastError
+      }
+
+      toast.success(data?.message || 'OTP sent to your email')
+      return { success: true, data }
+    } catch (error) {
+      const message = error?.response?.status === 401
+        ? 'Please login first, then try sending OTP again.'
+        : getErrorMessage(error, 'Unable to send OTP')
+      toast.error(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  const verifyOtp = useCallback(async ({ email, otp }) => {
+    setLoading(true)
+
+    const payload = {
+      email: email?.trim(),
+      otp: otp?.trim(),
+    }
+
+    Object.keys(payload).forEach((key) => {
+      if (!payload[key]) {
+        delete payload[key]
+      }
+    })
+
+    try {
+      let data
+      try {
+        const response = await axios.post(
+          `${getApiBaseUrl()}/api/verify-otp`,
+          payload,
+          { withCredentials: true }
+        )
+        data = response.data
+      } catch (primaryError) {
+        const hasAuthToken = Boolean(token || getStoredToken())
+        if (primaryError?.response?.status === 401 && hasAuthToken) {
+          const response = await axios.post(
+            `${getApiBaseUrl()}/api/verify-otp`,
+            payload,
+            getAuthConfig(token)
+          )
+          data = response.data
+        } else {
+          throw primaryError
+        }
+      }
+
+      toast.success(data?.message || 'Email verified successfully')
+      return { success: true, data }
+    } catch (error) {
+      const message = error?.response?.status === 401
+        ? 'Please login first, then verify your OTP.'
+        : getErrorMessage(error, 'Unable to verify OTP')
+      toast.error(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
   const resetPassword = useCallback(async ({ email, otp, password, confirmPassword }) => {
     setLoading(true)
 
@@ -167,8 +325,10 @@ export const AppContextProvider = ({ children }) => {
 
   const logoutUser = useCallback(() => {
     localStorage.removeItem('token')
+    localStorage.removeItem('userEmail')
     setToken('')
     setUser(null)
+    setUserEmail('')
   }, [])
 
   const contextValue = useMemo(
@@ -176,16 +336,19 @@ export const AppContextProvider = ({ children }) => {
       apiBaseUrl: getApiBaseUrl(),
       token,
       user,
+      userEmail,
       loading,
-      isAuthenticated: Boolean(token),
+      isAuthenticated: Boolean(token || user?.email || userEmail),
       registerUser,
       loginUser,
+      sendOtp,
+      verifyOtp,
       sendResetOtp,
       resetPassword,
       logoutUser,
       setUser,
     }),
-    [token, user, loading, registerUser, loginUser, sendResetOtp, resetPassword, logoutUser]
+    [token, user, userEmail, loading, registerUser, loginUser, sendOtp, verifyOtp, sendResetOtp, resetPassword, logoutUser]
   )
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
